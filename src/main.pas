@@ -42,7 +42,6 @@ type
     procedure FillMessages(AResponse: TStrings);
     function GetFolderName(Node: TTreeNode): string;
     procedure EnableControls(AEnabled: Boolean);
-    procedure Logout;
     function GetMessageId(const AResponseLine: string): Integer;
     function ParseFlags(const AResponse: string; var Index: Integer): string;
   public
@@ -58,28 +57,34 @@ implementation
 
 procedure TMainForm.btnLoginClick(Sender: TObject);
 begin
-  if (FChanging) then Exit;
+  if FChanging or clImap.Active or clOAuth1.Active then Exit;
 
-  if (clImap.Active) then Exit;
+  EnableControls(False);
+  try
+    clOAuth1.AuthUrl := 'https://login.live.com/oauth20_authorize.srf';
+    clOAuth1.TokenUrl := 'https://login.live.com/oauth20_token.srf';
+    clOAuth1.RedirectUrl := 'http://localhost';
 
-  clOAuth1.AuthUrl := 'https://login.live.com/oauth20_authorize.srf';
-  clOAuth1.TokenUrl := 'https://login.live.com/oauth20_token.srf';
-  clOAuth1.RedirectUrl := 'http://localhost';
-  clOAuth1.ClientID := 'a0a907aa-1e38-4bdb-8764-c4f931051018';
-  clOAuth1.ClientSecret := '6FYd=PdPS-06UgOdNlFon2TXo*BDyAi-';
-  clOAuth1.Scope := 'wl.imap wl.offline_access';
+    //You need to specify both Client ID and Client Secret of your Azure Active Directory App.
+    clOAuth1.ClientID := 'a0a9...';
+    clOAuth1.ClientSecret := '6FYd...';
 
-  clImap.Server := 'outlook.office365.com';
-  clImap.Port := 993;
-  clImap.UseTLS := ctImplicit;
+    clOAuth1.Scope := 'wl.imap wl.offline_access';
 
-  clImap.UserName := edtUser.Text;
+    clImap.Server := 'outlook.office365.com';
+    clImap.Port := 993;
+    clImap.UseTLS := ctImplicit;
 
-  clImap.Authorization := clOAuth1.GetAuthorization();
+    clImap.UserName := edtUser.Text;
 
-  clImap.Open();
+    clImap.Authorization := clOAuth1.GetAuthorization();
 
-  FillFolderList();
+    clImap.Open();
+
+    FillFolderList();
+  finally
+    EnableControls(True);
+  end;
 end;
 
 procedure TMainForm.FillFolderList;
@@ -148,15 +153,29 @@ end;
 
 procedure TMainForm.btnLogoutClick(Sender: TObject);
 begin
-  Logout();
+  try
+    clOAuth1.Close();
+  except
+    on EclSocketError do;
+  end;
+
+  try
+    clImap.Close();
+  except
+    on EclSocketError do;
+  end;
+
+  tvFolders.Items.Clear();
+  lvMessages.Clear();
+  ClearMessage();
 end;
 
 procedure TMainForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin
-  CanClose := (not clImap.Active) or (MessageDlg('Do you want to exit?', mtConfirmation, [mbYes, mbNo], 0) = mrYes);
-  if CanClose then
+  CanClose := (not clImap.Active) and (not clOAuth1.Active);
+  if (not CanClose) then
   begin
-    Logout();
+    ShowMessage('Cannot close the application, please log out first.');
   end;
 end;
 
@@ -322,29 +341,9 @@ begin
   memBody.Lines.Clear();
 end;
 
-procedure TMainForm.Logout;
-begin
-  try
-    clImap.Close();
-  except
-    on EclSocketError do;
-  end;
-
-  try
-    clOAuth1.Close();
-  except
-    on EclSocketError do;
-  end;
-
-  tvFolders.Items.Clear();
-  lvMessages.Clear();
-  ClearMessage();
-end;
-
 procedure TMainForm.EnableControls(AEnabled: Boolean);
 begin
   btnLogin.Enabled := AEnabled;
-  btnLogout.Enabled := AEnabled;
 
   if (AEnabled) then
   begin
