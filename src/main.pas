@@ -6,7 +6,7 @@ uses
   System.UITypes, Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, clOAuth, clTcpClient,
   clTcpClientTls, clTcpCommandClient, clMC, clImap4, Vcl.ComCtrls, Vcl.ImgList,
-  clMailMessage, clSocketUtils, ImapEnvelope;
+  clMailMessage, clSocketUtils, ImapEnvelope, Winapi.ShellAPI;
 
 type
   TMainForm = class(TForm)
@@ -153,6 +153,8 @@ end;
 
 procedure TMainForm.btnLogoutClick(Sender: TObject);
 begin
+  ShellExecute(0, 'open', PChar('https://login.microsoftonline.com/common/oauth2/v2.0/logout'), nil, nil, SW_SHOWNORMAL);
+
   try
     clOAuth1.Close();
   except
